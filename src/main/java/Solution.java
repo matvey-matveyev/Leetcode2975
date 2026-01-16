@@ -1,116 +1,142 @@
 import org.junit.jupiter.api.Assertions;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 class Solution {
 
     public int maximizeSquareArea(int m, int n, int[] hFences, int[] vFences) {
-        int[] hDistances = everDistancesPossible(m, hFences);
-        int[] hCombinations = combinations(hDistances);
-        int[] vDistances = everDistancesPossible(n, vFences);
-        int[] vCombinations = combinations(vDistances);
-        long mm = maxMatch(hCombinations, vCombinations);
-        if (mm == -1) {
+        try {
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            Future<int[]> fh = executor.submit(new Processor(m, hFences));
+            Future<int[]> fv = executor.submit(new Processor(n, vFences));
+            executor.shutdown();
+
+            long mm = maxMatch(fh.get(), fv.get());
+            if (mm == -1) {
+                return -1;
+            } else {
+                return (int) (mm * mm % 1000000007);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
             return -1;
-        } else {
-            return (int) (mm * mm % 1000000007);
         }
     }
 
-    private static int[] everDistancesPossible(int n, int[] fences) {
-        if (fences.length == 0) {
-            return new int[] {n - 1};
-        }
-        java.util.Arrays.sort(fences);
+    private static class Processor implements Callable<int[]> {
 
-        int[] distances = new int[fences.length + 1];
-        distances[0] = fences[0] - 1;
-        int i = 1;
-        while (i < fences.length) {
-            distances[i] = fences[i] - fences[i - 1];
-            i++;
-        }
-        distances[i] = n - fences[i - 1];
-        return distances;
-    }
+        int n;
+        int[] fences;
 
-    private static class Node {
-        int value;
-        Node next;
-
-        Node(int value) {
-            this.value = value;
+        Processor(int n, int[] fences) {
+            this.n = n;
+            this.fences = fences;
         }
 
         @Override
-        public String toString() {
-            return "{" + value + "}" + (next != null ? "->" + next.toString() : "");
-        }
-    }
+        public int[] call() throws Exception {
+            int[] hDistances = everDistancesPossible(n, fences);
+            return combinations(hDistances);
 
-    public static Node addSum(int sum, Node head) {
-        Node prev = head;
-        Node tail = head.next;
-        while (tail != null && tail.value < sum) {
-            prev = tail;
-            tail = tail.next;
-        }
-        if (tail == null) {
-            prev.next = new Node(sum);
-            return prev.next;
-        }
-        if (tail.value > sum) {
-            Node newNode = new Node(sum);
-            prev.next = newNode;
-            newNode.next = tail;
-            return newNode;
-        }
-        return tail;
-    }
-
-    public static int[] combinations(int[] distances) {
-        Node head = new Node(distances[0]);
-        Node tail = head;
-        for (int i = 1; i < distances.length; i++) {
-            tail.next = new Node(tail.value + distances[i]);
-            tail = tail.next;
         }
 
-        for (int i = 1; i < distances.length; i++) {
-            int sum = distances[i];
-            if (sum < head.value) {
+        private static int[] everDistancesPossible(int n, int[] fences) {
+            if (fences.length == 0) {
+                return new int[]{n - 1};
+            }
+            java.util.Arrays.sort(fences);
+
+            int[] distances = new int[fences.length + 1];
+            distances[0] = fences[0] - 1;
+            int i = 1;
+            while (i < fences.length) {
+                distances[i] = fences[i] - fences[i - 1];
+                i++;
+            }
+            distances[i] = n - fences[i - 1];
+            return distances;
+        }
+
+        private static class Node {
+            int value;
+            Node next;
+
+            Node(int value) {
+                this.value = value;
+            }
+
+            @Override
+            public String toString() {
+                return "{" + value + "}" + (next != null ? "->" + next.toString() : "");
+            }
+        }
+
+        public static Node addSum(int sum, Node head) {
+            Node prev = head;
+            Node tail = head.next;
+            while (tail != null && tail.value < sum) {
+                prev = tail;
+                tail = tail.next;
+            }
+            if (tail == null) {
+                prev.next = new Node(sum);
+                return prev.next;
+            }
+            if (tail.value > sum) {
                 Node newNode = new Node(sum);
-                newNode.next = head;
-                head = newNode;
-                tail = head;
-            } else if (sum > head.value) {
-                tail = addSum(sum, head);
-            } else {
-                tail = head;
+                prev.next = newNode;
+                newNode.next = tail;
+                return newNode;
             }
-
-            for (int j = i + 1; j < distances.length; j++) {
-                sum += distances[j];
-                tail = addSum(sum, tail);
-            }
+            return tail;
         }
 
-        int totalNodes = 1;
-        Node curr = head.next;
-        while (curr != null) {
-            totalNodes++;
-            curr = curr.next;
+        public static int[] combinations(int[] distances) {
+            Node head = new Node(distances[0]);
+            Node tail = head;
+            for (int i = 1; i < distances.length; i++) {
+                tail.next = new Node(tail.value + distances[i]);
+                tail = tail.next;
+            }
+
+            for (int i = 1; i < distances.length; i++) {
+                int sum = distances[i];
+                if (sum < head.value) {
+                    Node newNode = new Node(sum);
+                    newNode.next = head;
+                    head = newNode;
+                    tail = head;
+                } else if (sum > head.value) {
+                    tail = addSum(sum, head);
+                } else {
+                    tail = head;
+                }
+
+                for (int j = i + 1; j < distances.length; j++) {
+                    sum += distances[j];
+                    tail = addSum(sum, tail);
+                }
+            }
+
+            int totalNodes = 1;
+            Node curr = head.next;
+            while (curr != null) {
+                totalNodes++;
+                curr = curr.next;
+            }
+            int[] res = new int[totalNodes];
+            curr = head;
+            int idx = 0;
+            while (curr != null) {
+                res[idx++] = curr.value;
+                curr = curr.next;
+            }
+            return res;
         }
-        int[] res = new int[totalNodes];
-        curr = head;
-        int idx = 0;
-        while (curr != null) {
-            res[idx++] = curr.value;
-            curr = curr.next;
-        }
-        return res;
     }
 
     private static int maxMatch(int[] h, int[] v) {
@@ -130,43 +156,43 @@ class Solution {
 
     public static void main(String[] args) {
         int[] res;
-        res = Solution.everDistancesPossible(20, new int[] {5, 10, 15});
+        res = Solution.Processor.everDistancesPossible(20, new int[] {5, 10, 15});
         Assertions.assertArrayEquals(new int[] {4, 5, 5, 5}, res);
 
-        res = Solution.everDistancesPossible(20, new int[] {8, 14, 17, 19});
+        res = Solution.Processor.everDistancesPossible(20, new int[] {8, 14, 17, 19});
         Assertions.assertArrayEquals(new int[] {7, 6, 3, 2, 1}, res);
 
-        res = Solution.everDistancesPossible(20, new int[] {18, 19});
+        res = Solution.Processor.everDistancesPossible(20, new int[] {18, 19});
         Assertions.assertArrayEquals(new int[] {17, 1, 1}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {2, 3, 4});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {2, 3, 4});
         Assertions.assertArrayEquals(new int[] {1, 1, 1, 1}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {2, 4});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {2, 4});
         Assertions.assertArrayEquals(new int[] {1, 2, 1}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {3, 4});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {3, 4});
         Assertions.assertArrayEquals(new int[] {2, 1, 1}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {2, 3});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {2, 3});
         Assertions.assertArrayEquals(new int[] {1, 1, 2}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {});
         Assertions.assertArrayEquals(new int[] {4}, res);
 
-        res = Solution.everDistancesPossible(5, new int[] {2});
+        res = Solution.Processor.everDistancesPossible(5, new int[] {2});
         Assertions.assertArrayEquals(new int[] {1, 3}, res);
 
-        res = Solution.combinations(new int[] {2});
+        res = Solution.Processor.combinations(new int[] {2});
         Assertions.assertArrayEquals(new int[] {2}, res);
 
-        res = Solution.combinations(new int[] {2, 1});
+        res = Solution.Processor.combinations(new int[] {2, 1});
         Assertions.assertArrayEquals(new int[] {1, 2, 3}, res);
 
-        res = Solution.combinations(new int[] {1, 2});
+        res = Solution.Processor.combinations(new int[] {1, 2});
         Assertions.assertArrayEquals(new int[] {1, 2, 3}, res);
 
-        res = Solution.combinations(new int[] {5, 1, 2});
+        res = Solution.Processor.combinations(new int[] {5, 1, 2});
         Assertions.assertArrayEquals(new int[] {1, 2, 3, 5, 6, 8}, res);
 
         Solution s = new Solution();
