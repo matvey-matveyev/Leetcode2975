@@ -43,67 +43,68 @@ class Solution {
         Node(int value) {
             this.value = value;
         }
+
+        @Override
+        public String toString() {
+            return "{" + value + "}" + (next != null ? "->" + next.toString() : "");
+        }
+    }
+
+    public static Node addSum(int sum, Node head) {
+        Node prev = head;
+        Node tail = head.next;
+        while (tail != null && tail.value < sum) {
+            prev = tail;
+            tail = tail.next;
+        }
+        if (tail == null) {
+            prev.next = new Node(sum);
+            return prev.next;
+        }
+        if (tail.value > sum) {
+            Node newNode = new Node(sum);
+            prev.next = newNode;
+            newNode.next = tail;
+            return newNode;
+        }
+        return tail;
     }
 
     public static int[] combinations(int[] distances) {
-        int[][] combinations = new int[distances.length][];
-        for (int i = 0; i < distances.length; i++) {
-            combinations[i] = new int[distances.length - i];
-            int sum = combinations[i][0] = distances[i];
-            for (int j = 1; j < combinations[i].length; j++) {
-                sum += distances[i + j];
-                combinations[i][j] = sum;
+        Node head = new Node(distances[0]);
+        Node tail = head;
+        for (int i = 1; i < distances.length; i++) {
+            tail.next = new Node(tail.value + distances[i]);
+            tail = tail.next;
+        }
+
+        for (int i = 1; i < distances.length; i++) {
+            int sum = distances[i];
+            if (sum < head.value) {
+                Node newNode = new Node(sum);
+                newNode.next = head;
+                head = newNode;
+                tail = head;
+            } else if (sum > head.value) {
+                tail = addSum(sum, head);
+            } else {
+                tail = head;
+            }
+
+            for (int j = i + 1; j < distances.length; j++) {
+                sum += distances[j];
+                tail = addSum(sum, tail);
             }
         }
 
         int totalNodes = 1;
-        Node head = new Node(combinations[0][0]);
-        Node tail = head;
-        for (int i = 1; i < combinations[0].length; i++) {
-            tail.next = new Node(combinations[0][i]);
-            tail = tail.next;
+        Node curr = head.next;
+        while (curr != null) {
             totalNodes++;
+            curr = curr.next;
         }
-
-        for (int i = 1; i < combinations.length; i++) {
-            int[] cs = combinations[i];
-            int j = 0;
-            if (cs[j] < head.value) {
-                Node newNode = new Node(cs[j]);
-                newNode.next = head;
-                head = newNode;
-                totalNodes++;
-                j++;
-            }
-            Node prev = head;
-            tail = prev.next;
-
-            while (j < combinations[i].length) {
-                if (cs[j] >= tail.value) {
-                    if (tail.next == null) {
-                        break;
-                    }
-                    prev = tail;
-                    tail = tail.next;
-                } else {
-                    Node newNode = new Node(cs[j]);
-                    prev.next = newNode;
-                    newNode.next = tail;
-                    prev = newNode;
-                    totalNodes++;
-                    j++;
-                }
-            }
-            while (j < combinations[i].length) {
-                tail.next = new Node(cs[j]);
-                tail = tail.next;
-                totalNodes++;
-                j++;
-            }
-        }
-
         int[] res = new int[totalNodes];
-        Node curr = head;
+        curr = head;
         int idx = 0;
         while (curr != null) {
             res[idx++] = curr.value;
